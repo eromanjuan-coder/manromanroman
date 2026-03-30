@@ -2,6 +2,11 @@
 <html>
 <head>
     <title>Flappy Grade!</title>
+        <!-- Favicon link -->
+    <link rel="icon" type="image/png" sizes="32x32" href="wew.png">
+    <!-- Alternative formats for better browser support -->
+    <link rel="icon" type="image/x-icon" href="wew.png">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <style>
         body { 
@@ -11,7 +16,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             margin: 0;
             padding: 10px;
-            overflow: hidden; /* Prevents scrolling while playing */
+            overflow: hidden;
             touch-action: manipulation;
         }
         canvas { 
@@ -21,8 +26,8 @@
             border: 5px solid #fff; 
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-            max-width: 100%; /* Responsive: Fits mobile screens */
-            max-height: 80vh; /* Keeps it from being too tall */
+            max-width: 100%;
+            max-height: 80vh;
             cursor: pointer;
         }
         h1 { margin: 10px 0 5px 0; color: #006400; text-shadow: 1px 1px 0px white; font-size: 24px; }
@@ -31,7 +36,7 @@
 </head>
 <body>
     <h1>Flappy Grade!</h1>
-    <div class="info">Tap or Press Space to Pass!</div>
+    <div class="info">Jump to pass!!!</div>
     <canvas id="gameCanvas" width="400" height="500"></canvas>
 
     <script>
@@ -44,27 +49,22 @@
         let gravity = 0.22;
         let jump = -4.8;
         let gameOver = false;
-
-        //const grades = ["5", "5 hmmm","4","4","4","4","4.99","4.98","4.97", "4.96","4.95","hmmm", "3", "2.75", "2.50", "2.25", "2.00", "1.75", "1.50", "1.25", "1.00"];
         
         const grades = [];
-
-        // We start at 5 and go down to 1. 
-        // We use 0.01 as the step to get every single decimal point.
         for (let i = 5; i >= 1; i -= 0.01) {
-            // .toFixed(2) turns the number into a string like "4.99"
             grades.push(i.toFixed(2));
         }
-
-        console.log(grades);
-        // Output: ["5.00", "4.99", "4.08" ... "1.00"]
         
         let gradeIndex = 0;
-
         let pipes = [];
         let pipeWidth = 60;
         let pipeGap = 160;
         let pipeSpeed = 2.2;
+
+        let pencils = [];
+        let pencilWidth = 50;
+        let pencilHeight = 10;
+        let pencilSpeed = 4.5;
 
         let clouds = [
             {x: 50, y: 60, speed: 0.2, scale: 0.8},
@@ -78,22 +78,31 @@
             velocity = 0;
             gradeIndex = 0;
             pipes = [];
+            pencils = [];
             gameOver = false;
             loop();
         }
 
         function handleAction(e) {
-            if (e) e.preventDefault(); // Prevents zooming/scrolling on tap
-            if (gameOver) {
-                resetGame();
-            } else {
-                velocity = jump;
-            }
+            if (e) e.preventDefault();
+            if (gameOver) resetGame();
+            else velocity = jump;
         }
 
         function createPipe() {
             let pipeTopHeight = Math.random() * (canvas.height - pipeGap - 120) + 60;
-            pipes.push({ x: canvas.width, top: pipeTopHeight, passed: false });
+            // Added 'dy' for vertical movement and 'direction'
+            pipes.push({ 
+                x: canvas.width, 
+                top: pipeTopHeight, 
+                passed: false, 
+                dy: Math.random() > 0.5 ? 1 : -1 // Vertical direction
+            });
+        }
+
+        function createPencil() {
+            let pencilY = Math.random() * (canvas.height - 50) + 25;
+            pencils.push({ x: canvas.width + 100, y: pencilY });
         }
 
         function drawCloud(c) {
@@ -110,6 +119,8 @@
             velocity += gravity;
             birdY += velocity;
 
+            let currentGradeVal = parseFloat(grades[gradeIndex]);
+
             clouds.forEach(c => {
                 c.x -= c.speed;
                 if (c.x < -60) c.x = canvas.width + 60;
@@ -119,10 +130,27 @@
                 createPipe();
             }
 
+            // --- TRIAL 1: PENCILS (Between 4.90 and 4.80) ---
+            if (currentGradeVal <= 4.90 && currentGradeVal > 1.00) {
+                if (Math.random() < 0.02) createPencil(); 
+            }
+
+            // Update and Collision: Pipes
             for (let i = pipes.length - 1; i >= 0; i--) {
                 pipes[i].x -= pipeSpeed;
-                if (birdX + 20 > pipes[i].x && birdX < pipes[i].x + pipeWidth) {
-                    if (birdY - 20 < pipes[i].top || birdY > pipes[i].top + pipeGap) {
+
+                // --- TRIAL 2: MOVING PIPES (Starts at 4.85) ---
+                if (currentGradeVal <= 4.85) {
+                    pipes[i].top += pipes[i].dy * 1.5; // Move up or down
+                    // Bounce pipes if they go too high or low
+                    if (pipes[i].top < 40 || pipes[i].top > canvas.height - pipeGap - 40) {
+                        pipes[i].dy *= -1;
+                    }
+                }
+
+                // Collision
+                if (birdX + 30 > pipes[i].x && birdX < pipes[i].x + pipeWidth) {
+                    if (birdY - 20 < pipes[i].top || birdY + 10 > pipes[i].top + pipeGap) {
                         endGame();
                     }
                 }
@@ -134,6 +162,18 @@
                 if (pipes[i].x + pipeWidth < 0) pipes.splice(i, 1);
             }
 
+            // Update and Collision: Pencils
+            for (let i = pencils.length - 1; i >= 0; i--) {
+                pencils[i].x -= pencilSpeed;
+                if (birdX < pencils[i].x + pencilWidth &&
+                    birdX + 40 > pencils[i].x &&
+                    birdY - 20 < pencils[i].y + pencilHeight &&
+                    birdY + 10 > pencils[i].y) {
+                    endGame();
+                }
+                if (pencils[i].x + pencilWidth < 0) pencils.splice(i, 1);
+            }
+
             if (birdY > canvas.height || birdY < 0) endGame();
         }
 
@@ -142,14 +182,26 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             clouds.forEach(c => drawCloud(c));
 
-            ctx.fillStyle = "#27ae60";
             pipes.forEach(p => {
+                ctx.fillStyle = "#27ae60";
                 ctx.fillRect(p.x, 0, pipeWidth, p.top);
                 ctx.fillRect(p.x, p.top + pipeGap, pipeWidth, canvas.height);
                 ctx.fillStyle = "#1e8449";
                 ctx.fillRect(p.x - 5, p.top - 20, pipeWidth + 10, 20);
                 ctx.fillRect(p.x - 5, p.top + pipeGap, pipeWidth + 10, 20);
-                ctx.fillStyle = "#27ae60";
+            });
+
+            pencils.forEach(pen => {
+                ctx.fillStyle = "#f1c40f"; 
+                ctx.fillRect(pen.x, pen.y, pencilWidth - 10, pencilHeight);
+                ctx.fillStyle = "#e84393"; 
+                ctx.fillRect(pen.x + pencilWidth - 10, pen.y, 10, pencilHeight);
+                ctx.fillStyle = "#333"; 
+                ctx.beginPath();
+                ctx.moveTo(pen.x, pen.y);
+                ctx.lineTo(pen.x - 10, pen.y + (pencilHeight/2));
+                ctx.lineTo(pen.x, pen.y + pencilHeight);
+                ctx.fill();
             });
 
             ctx.fillStyle = "#006400";
@@ -159,17 +211,12 @@
             if (gameOver) {
                 ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                let currentGrade = grades[gradeIndex];
-                let val = parseFloat(currentGrade);
-                let passed = !isNaN(val) && val <= 3.0;
-                
                 ctx.fillStyle = "white";
                 ctx.textAlign = "center";
                 ctx.font = "bold 36px Arial";
-                ctx.fillText(passed ? "YOU PASSED!" : "FAILED", canvas.width/2, canvas.height/2);
+                ctx.fillText(parseFloat(grades[gradeIndex]) <= 3.0 ? "YOU PASSED!" : "FAILED", canvas.width/2, canvas.height/2);
                 ctx.font = "20px Arial";
-                ctx.fillText("Final Grade: " + currentGrade, canvas.width/2, canvas.height/2 + 50);
+                ctx.fillText("Grade: " + grades[gradeIndex], canvas.width/2, canvas.height/2 + 50);
                 ctx.fillText("Tap to Retake", canvas.width/2, canvas.height/2 + 90);
                 ctx.textAlign = "start";
             }
@@ -183,11 +230,10 @@
             if (!gameOver) requestAnimationFrame(loop);
         }
 
-        // Listeners for Desktop and Mobile para natataptap
         window.addEventListener('keydown', (e) => { if (e.code === 'Space') handleAction(e); });
         canvas.addEventListener('mousedown', (e) => { handleAction(e); });
         canvas.addEventListener('touchstart', (e) => { handleAction(e); }, {passive: false});
-        //Roman Juan G. Eugenio I
+
         resetGame();
     </script>
 </body>
